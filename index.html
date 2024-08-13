@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Room</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="logo">Chat Room</h1>
+        <form class="form" id="form">
+            <input class="input" type="text" placeholder="Name" id="myname" required>
+            <input class="input" type="text" placeholder="Message" id="message" required>
+            <button class="button" type="submit">Send Message</button>
+        </form>
+        <div class="messageArea" id="messageArea"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket = io.connect('http://localhost:5000');  // Connect to the server on port 5000
+        let form = document.getElementById('form');
+        let myname = document.getElementById('myname');
+        let message = document.getElementById('message');
+        let messageArea = document.getElementById('messageArea');
+
+        let typing = false;
+        let timeout = undefined;
+
+        // Emit 'stop typing' event when message is sent
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            if (myname.value && message.value) {
+                const chat = {
+                    username: myname.value,
+                    message: message.value
+                };
+                socket.emit('chat message', chat);
+                message.value = '';  // Clear the input after sending
+
+                typing = false;
+                socket.emit('stop typing');
+            }
+        });
+
+        // Display incoming messages
+        socket.on('chat message', (chat) => {
+            let messageBlock = document.createElement('div');
+            messageBlock.classList.add('message-block');
+
+            messageBlock.innerHTML = `<span class="username">${chat.username}:</span> <span class="message-content">${chat.message}</span>`;
+            messageArea.appendChild(messageBlock);
+
+            messageArea.scrollTop = messageArea.scrollHeight;  // Auto-scroll to the bottom
+        });
+
+        // Emit 'typing' event on input
+        message.addEventListener('input', () => {
+            if (!typing) {
+                typing = true;
+                socket.emit('typing', myname.value);
+            }
+
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                typing = false;
+                socket.emit('stop typing');
+            }, 1000);  
+        });
+
+        socket.on('typing', (username) => {
+            let typingIndicator = document.getElementById('typingIndicator');
+            if (!typingIndicator) {
+                typingIndicator = document.createElement('div');
+                typingIndicator.id = 'typingIndicator';
+                typingIndicator.innerText = `${username} is typing...`;
+                messageArea.appendChild(typingIndicator);
+            }
+        });
+
+        socket.on('stop typing', () => {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        });
+
+    </script>
+</body>
+</html>
